@@ -1,60 +1,125 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { Toaster, toast } from 'sonner';
 import { ThemeToggle } from './components/theme-toggle';
 import { ImageUpload } from './components/image-upload';
+import { EnhancedColorCard } from './components/enhanced-color-card';
+import { QuickActionsToolbar } from './components/quick-actions-toolbar';
+import { KeyboardShortcutsDialog } from './components/keyboard-shortcuts-dialog';
+import { ColorInputDialog } from './components/color-input-dialog';
+import { ShareDialog } from './components/share-dialog';
+import { PaletteMetrics } from './components/palette-metrics';
+import { TemplatesDialog } from './components/templates-dialog';
+import { GradientGenerator } from './components/gradient-generator';
+import { ColorWheel } from './components/color-wheel';
+import { UIMockupPreview } from './components/ui-mockup-preview';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
-import { Slider } from './components/ui/slider';
 import {
   generatePalette,
   generateRandomColor,
   hexToPaletteColor,
   adjustColor,
-  getContrastRatio,
   type HarmonyType,
   type PaletteColor,
 } from './utils/colorTheory';
 import { copyToClipboard, downloadPalette, type ExportFormat } from './utils/exportFormats';
 import {
+  lightenColor,
+  darkenColor,
+  saturateColor,
+  desaturateColor,
+  
+  invertColor,
+  decodePaletteFromURL,
+  encodePaletteToURL,
+} from './utils/colorHelpers';
+import {
   Shuffle,
-  Lock,
-  Unlock,
-  Copy,
   Download,
-  Check,
+  Copy,
   Palette,
-  AlertCircle,
+  Share2,
+  Sparkles,
+  Keyboard as KeyboardIcon,
+  BookTemplate,
 } from 'lucide-react';
+import { usePaletteHistory } from './hooks/usePaletteHistory';
+import { useLocalStorage } from './hooks/useLocalStorage';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 const HARMONY_TYPES: { value: HarmonyType; label: string; description: string }[] = [
-  { value: 'monochromatic', label: 'Monochromatic', description: 'Variations of a single hue' },
+  { value: 'monochromatic', label: 'Monochromatic', description: 'Single hue variations' },
   { value: 'analogous', label: 'Analogous', description: 'Adjacent colors (±30°)' },
-  { value: 'complementary', label: 'Complementary', description: 'Opposite colors (180°)' },
-  { value: 'triadic', label: 'Triadic', description: 'Three colors (120° apart)' },
-  { value: 'tetradic', label: 'Tetradic', description: 'Two complementary pairs' },
+  { value: 'complementary', label: 'Complementary', description: 'Opposite (180°)' },
+  { value: 'triadic', label: 'Triadic', description: '120° spacing' },
+  { value: 'tetradic', label: 'Tetradic', description: 'Two pairs' },
 ];
 
 const EXPORT_FORMATS: { value: ExportFormat; label: string }[] = [
   { value: 'hex', label: 'HEX' },
   { value: 'rgb', label: 'RGB' },
   { value: 'hsl', label: 'HSL' },
-  { value: 'css', label: 'CSS Variables' },
+  { value: 'css', label: 'CSS' },
   { value: 'scss', label: 'SCSS' },
   { value: 'json', label: 'JSON' },
+  { value: 'tailwind', label: 'Tailwind' },
+  { value: 'materialui', label: 'Material-UI' },
+  { value: 'android', label: 'Android' },
+  { value: 'ios', label: 'iOS' },
+  { value: 'svg', label: 'SVG' },
+  { value: 'markdown', label: 'Markdown' },
 ];
 
 function App() {
-  const [harmonyType, setHarmonyType] = useState<HarmonyType>('complementary');
+  const [harmonyType, setHarmonyType] = useLocalStorage<HarmonyType>('harmonyType', 'complementary');
   const [palette, setPalette] = useState<PaletteColor[]>([]);
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [exportFormat, setExportFormat] = useState<ExportFormat>('hex');
+  const [exportFormat, setExportFormat] = useLocalStorage<ExportFormat>('exportFormat', 'hex');
 
-  // Generate initial palette
+  // Dialogs
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  // History
+  const { addToHistory, undo, redo, canUndo, canRedo } = usePaletteHistory();
+
+  // Load palette from URL on mount
   useEffect(() => {
-    handleGenerate();
+    const params = new URLSearchParams(window.location.search);
+    const colorsParam = params.get('colors');
+
+    if (colorsParam) {
+      try {
+        const colors = decodePaletteFromURL(colorsParam);
+        const roles: PaletteColor['role'][] = ['primary', 'secondary', 'accent', 'background', 'support'];
+        const newPalette = colors.slice(0, 5).map((hex, index) =>
+          hexToPaletteColor(hex, `color-${index}`, roles[index], false)
+        );
+        setPalette(newPalette);
+        toast.success('Palette loaded from URL!');
+      } catch (err) {
+        console.error('Failed to load palette from URL:', err);
+        handleGenerate();
+      }
+    } else {
+      handleGenerate();
+    }
   }, []);
 
-  const handleGenerate = () => {
+  // Update URL when palette changes
+  useEffect(() => {
+    if (palette.length > 0) {
+      const colors = palette.map(c => c.hex);
+      const encoded = encodePaletteToURL(colors);
+      const newUrl = `${window.location.pathname}?colors=${encoded}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [palette]);
+
+  const handleGenerate = useCallback(() => {
     const baseColor = generateRandomColor();
     const colors = generatePalette(baseColor, harmonyType);
     const roles: PaletteColor['role'][] = ['primary', 'secondary', 'accent', 'background', 'support'];
@@ -68,7 +133,9 @@ function App() {
     });
 
     setPalette(newPalette);
-  };
+    addToHistory(newPalette);
+    toast.success('New palette generated!');
+  }, [harmonyType, palette, addToHistory]);
 
   const handleHarmonyChange = (type: HarmonyType) => {
     setHarmonyType(type);
@@ -86,23 +153,22 @@ function App() {
     });
 
     setPalette(newPalette);
+    addToHistory(newPalette);
   };
 
   const toggleLock = (id: string) => {
-    setPalette(prev =>
-      prev.map(color =>
+    setPalette(prev => {
+      const newPalette = prev.map(color =>
         color.id === id ? { ...color, locked: !color.locked } : color
-      )
-    );
+      );
+      addToHistory(newPalette);
+      return newPalette;
+    });
   };
 
-  const handleColorAdjustment = (
-    id: string,
-    type: 'h' | 's' | 'l',
-    value: number
-  ) => {
-    setPalette(prev =>
-      prev.map(color => {
+  const handleColorAdjustment = (id: string, type: 'h' | 's' | 'l', value: number) => {
+    setPalette(prev => {
+      const newPalette = prev.map(color => {
         if (color.id !== id) return color;
 
         const adjustments = {
@@ -113,8 +179,10 @@ function App() {
 
         const newHex = adjustColor(color.hex, adjustments);
         return hexToPaletteColor(newHex, color.id, color.role, color.locked);
-      })
-    );
+      });
+      addToHistory(newPalette);
+      return newPalette;
+    });
   };
 
   const copyColor = async (hex: string, index: number) => {
@@ -122,17 +190,24 @@ function App() {
       await navigator.clipboard.writeText(hex);
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
+      toast.success(`Copied ${hex}`);
     } catch (error) {
-      console.error('Failed to copy:', error);
+      toast.error('Failed to copy color');
     }
   };
 
   const handleExport = async () => {
-    await copyToClipboard(palette, exportFormat);
+    const success = await copyToClipboard(palette, exportFormat);
+    if (success) {
+      toast.success(`Copied as ${exportFormat.toUpperCase()}!`);
+    } else {
+      toast.error('Failed to copy');
+    }
   };
 
   const handleDownload = () => {
     downloadPalette(palette, exportFormat);
+    toast.success(`Downloaded as ${exportFormat.toUpperCase()}!`);
   };
 
   const handleImageColors = (colors: string[]) => {
@@ -141,32 +216,173 @@ function App() {
       hexToPaletteColor(hex, `color-${index}`, roles[index], false)
     );
     setPalette(newPalette);
+    addToHistory(newPalette);
+    toast.success('Colors extracted from image!');
   };
 
-  const checkContrast = (color1: string, color2: string) => {
-    const ratio = getContrastRatio(color1, color2);
-    return {
-      ratio: ratio.toFixed(2),
-      passAA: ratio >= 4.5,
-      passAAA: ratio >= 7,
-    };
+  const handleColorSelected = (color: string) => {
+    const colors = generatePalette(color, harmonyType);
+    const roles: PaletteColor['role'][] = ['primary', 'secondary', 'accent', 'background', 'support'];
+    const newPalette = colors.map((hex, index) =>
+      hexToPaletteColor(hex, `color-${index}`, roles[index], false)
+    );
+    setPalette(newPalette);
+    addToHistory(newPalette);
+    toast.success('Palette generated from your color!');
   };
 
-  const handleKeyPress = (e: KeyboardEvent) => {
-    if (e.code === 'Space' && e.target === document.body) {
-      e.preventDefault();
-      handleGenerate();
+  const handleTemplateSelected = (colors: string[]) => {
+    const roles: PaletteColor['role'][] = ['primary', 'secondary', 'accent', 'background', 'support'];
+    const newPalette = colors.slice(0, 5).map((hex, index) =>
+      hexToPaletteColor(hex, `color-${index}`, roles[index], false)
+    );
+    setPalette(newPalette);
+    addToHistory(newPalette);
+    toast.success('Template applied!');
+  };
+
+  // Quick Actions
+  const handleUndo = () => {
+    const previousPalette = undo();
+    if (previousPalette) {
+      setPalette(previousPalette);
+      toast.info('Undo');
     }
   };
 
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [palette, harmonyType]);
+  const handleRedo = () => {
+    const nextPalette = redo();
+    if (nextPalette) {
+      setPalette(nextPalette);
+      toast.info('Redo');
+    }
+  };
+
+  const handleReset = () => {
+    handleGenerate();
+  };
+
+  const handleLockAll = () => {
+    setPalette(prev => {
+      const newPalette = prev.map(c => ({ ...c, locked: true }));
+      addToHistory(newPalette);
+      return newPalette;
+    });
+    toast.info('All colors locked');
+  };
+
+  const handleUnlockAll = () => {
+    setPalette(prev => {
+      const newPalette = prev.map(c => ({ ...c, locked: false }));
+      addToHistory(newPalette);
+      return newPalette;
+    });
+    toast.info('All colors unlocked');
+  };
+
+  const handleRandomizeSingle = () => {
+    const unlockedIndices = palette.map((c, i) => c.locked ? -1 : i).filter(i => i >= 0);
+    if (unlockedIndices.length === 0) {
+      toast.error('All colors are locked!');
+      return;
+    }
+
+    const randomIndex = unlockedIndices[Math.floor(Math.random() * unlockedIndices.length)];
+    setPalette(prev => {
+      const newPalette = [...prev];
+      newPalette[randomIndex] = hexToPaletteColor(
+        generateRandomColor(),
+        newPalette[randomIndex].id,
+        newPalette[randomIndex].role,
+        false
+      );
+      addToHistory(newPalette);
+      return newPalette;
+    });
+    toast.success('Randomized one color!');
+  };
+
+  const handleInvertColors = () => {
+    setPalette(prev => {
+      const newPalette = prev.map(color => {
+        const inverted = invertColor(color.hex);
+        return hexToPaletteColor(inverted, color.id, color.role, color.locked);
+      });
+      addToHistory(newPalette);
+      return newPalette;
+    });
+    toast.success('Colors inverted!');
+  };
+
+  const handleLighten = () => {
+    setPalette(prev => {
+      const newPalette = prev.map(color => {
+        const lightened = lightenColor(color.hex, 10);
+        return hexToPaletteColor(lightened, color.id, color.role, color.locked);
+      });
+      addToHistory(newPalette);
+      return newPalette;
+    });
+    toast.success('Colors lightened!');
+  };
+
+  const handleDarken = () => {
+    setPalette(prev => {
+      const newPalette = prev.map(color => {
+        const darkened = darkenColor(color.hex, 10);
+        return hexToPaletteColor(darkened, color.id, color.role, color.locked);
+      });
+      addToHistory(newPalette);
+      return newPalette;
+    });
+    toast.success('Colors darkened!');
+  };
+
+  const handleSaturate = () => {
+    setPalette(prev => {
+      const newPalette = prev.map(color => {
+        const saturated = saturateColor(color.hex, 10);
+        return hexToPaletteColor(saturated, color.id, color.role, color.locked);
+      });
+      addToHistory(newPalette);
+      return newPalette;
+    });
+    toast.success('Saturation increased!');
+  };
+
+  const handleDesaturate = () => {
+    setPalette(prev => {
+      const newPalette = prev.map(color => {
+        const desaturated = desaturateColor(color.hex, 10);
+        return hexToPaletteColor(desaturated, color.id, color.role, color.locked);
+      });
+      addToHistory(newPalette);
+      return newPalette;
+    });
+    toast.success('Saturation decreased!');
+  };
+
+  // Keyboard Shortcuts
+  useKeyboardShortcuts([
+    { key: ' ', handler: handleGenerate, description: 'Generate new palette' },
+    { key: 'z', ctrl: true, handler: handleUndo, description: 'Undo' },
+    { key: 'y', ctrl: true, handler: handleRedo, description: 'Redo' },
+    { key: 'y', ctrl: true, shift: true, handler: handleRedo, description: 'Redo (alt)' },
+    { key: 'r', handler: handleReset, description: 'Reset palette' },
+    { key: 'i', handler: handleInvertColors, description: 'Invert colors' },
+    { key: '?', handler: () => setShowShortcuts(true), description: 'Show shortcuts' },
+    { key: '1', handler: () => setSelectedColorId(palette[0]?.id || null), description: 'Select color 1' },
+    { key: '2', handler: () => setSelectedColorId(palette[1]?.id || null), description: 'Select color 2' },
+    { key: '3', handler: () => setSelectedColorId(palette[2]?.id || null), description: 'Select color 3' },
+    { key: '4', handler: () => setSelectedColorId(palette[3]?.id || null), description: 'Select color 4' },
+    { key: '5', handler: () => setSelectedColorId(palette[4]?.id || null), description: 'Select color 5' },
+  ]);
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+      <Toaster position="top-center" richColors />
+
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -175,18 +391,28 @@ function App() {
               Color Palette Generator
             </h1>
             <p className="text-muted-foreground mt-2">
-              Create harmonious color schemes with AI-driven features and color theory
+              Create harmonious color schemes with advanced tools and AI features
             </p>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowShortcuts(true)}
+              title="Keyboard Shortcuts (?)"
+            >
+              <KeyboardIcon className="h-4 w-4" />
+            </Button>
+            <ThemeToggle />
+          </div>
         </div>
 
-        {/* Controls */}
+        {/* Harmony Type Selection */}
         <Card>
           <CardHeader>
-            <CardTitle>Harmony Type</CardTitle>
+            <CardTitle>Color Harmony</CardTitle>
             <CardDescription>
-              Select a color harmony model based on color wheel relationships
+              Select a color theory model to generate harmonious palettes
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -208,142 +434,98 @@ function App() {
           </CardContent>
         </Card>
 
-        {/* Generate Button */}
-        <div className="flex gap-3 justify-center">
+        {/* Main Actions */}
+        <div className="flex flex-wrap gap-3 justify-center">
           <Button
             onClick={handleGenerate}
             size="lg"
-            className="gap-2 text-lg px-8"
+            className="gap-2"
           >
             <Shuffle className="h-5 w-5" />
             Generate Palette
-            <span className="text-xs opacity-70">(or press Space)</span>
+            <kbd className="ml-2 px-2 py-0.5 bg-primary-foreground/20 rounded text-xs">
+              Space
+            </kbd>
+          </Button>
+          <Button
+            onClick={() => setShowColorPicker(true)}
+            size="lg"
+            variant="outline"
+            className="gap-2"
+          >
+            <Sparkles className="h-5 w-5" />
+            Pick Base Color
+          </Button>
+          <Button
+            onClick={() => setShowTemplates(true)}
+            size="lg"
+            variant="outline"
+            className="gap-2"
+          >
+            <BookTemplate className="h-5 w-5" />
+            Templates
+          </Button>
+          <Button
+            onClick={() => setShowShareDialog(true)}
+            size="lg"
+            variant="outline"
+            className="gap-2"
+          >
+            <Share2 className="h-5 w-5" />
+            Share
           </Button>
         </div>
+
+        {/* Quick Actions Toolbar */}
+        <QuickActionsToolbar
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onReset={handleReset}
+          onLockAll={handleLockAll}
+          onUnlockAll={handleUnlockAll}
+          onRandomizeSingle={handleRandomizeSingle}
+          onInvertColors={handleInvertColors}
+          onLighten={handleLighten}
+          onDarken={handleDarken}
+          onSaturate={handleSaturate}
+          onDesaturate={handleDesaturate}
+          palette={palette}
+        />
 
         {/* Image Upload */}
         <ImageUpload onColorsExtracted={handleImageColors} />
 
         {/* Color Palette Display */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {palette.map((color, index) => {
-            const contrast = index > 0 ? checkContrast(palette[0].hex, color.hex) : null;
-
-            return (
-              <Card
-                key={color.id}
-                className="overflow-hidden hover:shadow-lg transition-shadow"
-              >
-                <div
-                  className="h-32 cursor-pointer relative group"
-                  style={{ backgroundColor: color.hex }}
-                  onClick={() => setSelectedColor(selectedColor === color.id ? null : color.id)}
-                >
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="absolute top-2 right-2 opacity-80 hover:opacity-100"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleLock(color.id);
-                    }}
-                  >
-                    {color.locked ? (
-                      <Lock className="h-4 w-4" />
-                    ) : (
-                      <Unlock className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                <CardContent className="p-4 space-y-3">
-                  <div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                      {color.role}
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono font-semibold">{color.hex}</span>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => copyColor(color.hex, index)}
-                        className="h-8 w-8"
-                      >
-                        {copiedIndex === index ? (
-                          <Check className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="text-xs space-y-1">
-                    <div>RGB: {color.rgb.r}, {color.rgb.g}, {color.rgb.b}</div>
-                    <div>HSL: {color.hsl.h}°, {color.hsl.s}%, {color.hsl.l}%</div>
-                  </div>
-
-                  {contrast && (
-                    <div className="text-xs border-t pt-2">
-                      <div className="flex items-center gap-1 mb-1">
-                        {contrast.passAA ? (
-                          <Check className="h-3 w-3 text-green-500" />
-                        ) : (
-                          <AlertCircle className="h-3 w-3 text-yellow-500" />
-                        )}
-                        <span>Contrast: {contrast.ratio}:1</span>
-                      </div>
-                      <div className="text-muted-foreground">
-                        {contrast.passAAA ? 'AAA' : contrast.passAA ? 'AA' : 'Fail'}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedColor === color.id && (
-                    <div className="space-y-3 pt-2 border-t">
-                      <div>
-                        <label className="text-xs text-muted-foreground">
-                          Hue: {color.hsl.h}°
-                        </label>
-                        <Slider
-                          value={[color.hsl.h]}
-                          onValueChange={([v]) => handleColorAdjustment(color.id, 'h', v)}
-                          min={0}
-                          max={360}
-                          step={1}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">
-                          Saturation: {color.hsl.s}%
-                        </label>
-                        <Slider
-                          value={[color.hsl.s]}
-                          onValueChange={([v]) => handleColorAdjustment(color.id, 's', v)}
-                          min={0}
-                          max={100}
-                          step={1}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">
-                          Lightness: {color.hsl.l}%
-                        </label>
-                        <Slider
-                          value={[color.hsl.l]}
-                          onValueChange={([v]) => handleColorAdjustment(color.id, 'l', v)}
-                          min={0}
-                          max={100}
-                          step={1}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+          {palette.map((color, index) => (
+            <EnhancedColorCard
+              key={color.id}
+              color={color}
+              index={index}
+              isSelected={selectedColorId === color.id}
+              copiedIndex={copiedIndex}
+              onSelect={() => setSelectedColorId(selectedColorId === color.id ? null : color.id)}
+              onToggleLock={() => toggleLock(color.id)}
+              onCopy={() => copyColor(color.hex, index)}
+              onAdjust={(type, value) => handleColorAdjustment(color.id, type, value)}
+              contrastWith={palette[0]?.hex}
+            />
+          ))}
         </div>
+
+        {/* Palette Metrics */}
+        {palette.length > 0 && <PaletteMetrics palette={palette} />}
+
+        {/* Gradient Generator */}
+        {palette.length > 0 && <GradientGenerator palette={palette} />}
+
+        {/* Color Wheel Visualization */}
+        {palette.length > 0 && <ColorWheel palette={palette} />}
+
+        {/* UI Mockup Preview */}
+        {palette.length > 0 && <UIMockupPreview palette={palette} />}
 
         {/* Export Section */}
         <Card>
@@ -354,18 +536,19 @@ function App() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2 mb-4">
               {EXPORT_FORMATS.map(format => (
                 <Button
                   key={format.value}
                   variant={exportFormat === format.value ? 'default' : 'outline'}
+                  size="sm"
                   onClick={() => setExportFormat(format.value)}
                 >
                   {format.label}
                 </Button>
               ))}
             </div>
-            <div className="flex gap-3 mt-4">
+            <div className="flex gap-3">
               <Button onClick={handleExport} className="gap-2">
                 <Copy className="h-4 w-4" />
                 Copy to Clipboard
@@ -379,15 +562,36 @@ function App() {
         </Card>
 
         {/* Footer */}
-        <div className="text-center text-sm text-muted-foreground pb-8">
+        <div className="text-center text-sm text-muted-foreground py-6 border-t">
           <p>
-            Built with React, TypeScript, Tailwind CSS, shadcn/ui, and Chroma.js
+            Built with React, TypeScript, Tailwind CSS, shadcn/ui, Framer Motion, and Chroma.js
           </p>
-          <p className="mt-1">
-            Press <kbd className="px-2 py-1 bg-muted rounded">Space</kbd> to generate new palette
+          <p className="mt-2">
+            Press <kbd className="px-2 py-1 bg-muted rounded text-xs">?</kbd> for keyboard shortcuts
           </p>
         </div>
       </div>
+
+      {/* Dialogs */}
+      <KeyboardShortcutsDialog
+        open={showShortcuts}
+        onOpenChange={setShowShortcuts}
+      />
+      <ColorInputDialog
+        open={showColorPicker}
+        onOpenChange={setShowColorPicker}
+        onColorSelected={handleColorSelected}
+      />
+      <ShareDialog
+        open={showShareDialog}
+        onOpenChange={setShowShareDialog}
+        palette={palette}
+      />
+      <TemplatesDialog
+        open={showTemplates}
+        onOpenChange={setShowTemplates}
+        onSelectTemplate={handleTemplateSelected}
+      />
     </div>
   );
 }
