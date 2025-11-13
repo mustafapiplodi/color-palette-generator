@@ -12,8 +12,22 @@ import { TemplatesDialog } from './components/templates-dialog';
 import { GradientGenerator } from './components/gradient-generator';
 import { ColorWheel } from './components/color-wheel';
 import { UIMockupPreview } from './components/ui-mockup-preview';
+import { CollapsibleSection } from './components/collapsible-section';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './components/ui/select';
 import {
   generatePalette,
   generateRandomColor,
@@ -407,34 +421,38 @@ function App() {
           </div>
         </div>
 
-        {/* Harmony Type Selection */}
+        {/* Harmony Type Selection - Compact */}
         <Card>
-          <CardHeader>
-            <CardTitle>Color Harmony</CardTitle>
-            <CardDescription>
-              Select a color theory model to generate harmonious palettes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {HARMONY_TYPES.map(type => (
-                <Button
-                  key={type.value}
-                  variant={harmonyType === type.value ? 'default' : 'outline'}
-                  onClick={() => handleHarmonyChange(type.value)}
-                  className="flex flex-col h-auto py-3"
-                >
-                  <span className="font-semibold">{type.label}</span>
-                  <span className="text-xs opacity-70 font-normal">
-                    {type.description}
-                  </span>
-                </Button>
-              ))}
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <label className="text-sm font-medium whitespace-nowrap">
+                Color Harmony:
+              </label>
+              <Select value={harmonyType} onValueChange={(value) => handleHarmonyChange(value as HarmonyType)}>
+                <SelectTrigger className="w-[280px]">
+                  <SelectValue placeholder="Select harmony type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {HARMONY_TYPES.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      <div className="flex flex-col">
+                        <span className="font-semibold">{type.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {type.description}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground ml-auto">
+                Choose a color theory model for your palette
+              </span>
             </div>
           </CardContent>
         </Card>
 
-        {/* Main Actions */}
+        {/* Main Actions - Simplified */}
         <div className="flex flex-wrap gap-3 justify-center">
           <Button
             onClick={handleGenerate}
@@ -447,33 +465,29 @@ function App() {
               Space
             </kbd>
           </Button>
-          <Button
-            onClick={() => setShowColorPicker(true)}
-            size="lg"
-            variant="outline"
-            className="gap-2"
-          >
-            <Sparkles className="h-5 w-5" />
-            Pick Base Color
-          </Button>
-          <Button
-            onClick={() => setShowTemplates(true)}
-            size="lg"
-            variant="outline"
-            className="gap-2"
-          >
-            <BookTemplate className="h-5 w-5" />
-            Templates
-          </Button>
-          <Button
-            onClick={() => setShowShareDialog(true)}
-            size="lg"
-            variant="outline"
-            className="gap-2"
-          >
-            <Share2 className="h-5 w-5" />
-            Share
-          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="lg" variant="outline" className="gap-2">
+                <Sparkles className="h-5 w-5" />
+                More Options
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-56">
+              <DropdownMenuItem onClick={() => setShowColorPicker(true)}>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Pick Base Color
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowTemplates(true)}>
+                <BookTemplate className="h-4 w-4 mr-2" />
+                Choose Template
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowShareDialog(true)}>
+                <Share2 className="h-4 w-4 mr-2" />
+                Share Palette
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Quick Actions Toolbar */}
@@ -494,40 +508,101 @@ function App() {
           palette={palette}
         />
 
-        {/* Image Upload */}
-        <ImageUpload onColorsExtracted={handleImageColors} />
+        {/* Image Upload - Collapsible */}
+        <CollapsibleSection
+          title="📸 Extract from Image"
+          description="Upload an image to extract its color palette"
+          defaultOpen={false}
+          icon={null}
+        >
+          <ImageUpload onColorsExtracted={handleImageColors} />
+        </CollapsibleSection>
 
         {/* Color Palette Display */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {palette.map((color, index) => (
-            <EnhancedColorCard
-              key={color.id}
-              color={color}
-              index={index}
-              isSelected={selectedColorId === color.id}
-              copiedIndex={copiedIndex}
-              onSelect={() => setSelectedColorId(selectedColorId === color.id ? null : color.id)}
-              onToggleLock={() => toggleLock(color.id)}
-              onCopy={() => copyColor(color.hex, index)}
-              onAdjust={(type, value) => handleColorAdjustment(color.id, type, value)}
-              contrastWith={palette[0]?.hex}
-            />
-          ))}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {palette.map((color, index) => (
+              <EnhancedColorCard
+                key={color.id}
+                color={color}
+                index={index}
+                isSelected={selectedColorId === color.id}
+                copiedIndex={copiedIndex}
+                onSelect={() => setSelectedColorId(selectedColorId === color.id ? null : color.id)}
+                onToggleLock={() => toggleLock(color.id)}
+                onCopy={() => copyColor(color.hex, index)}
+                onAdjust={(type, value) => handleColorAdjustment(color.id, type, value)}
+                contrastWith={palette[0]?.hex}
+              />
+            ))}
+          </div>
+
+          {/* Quick Copy All HEX */}
+          {palette.length > 0 && (
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  const hexColors = palette.map(c => c.hex).join(', ');
+                  try {
+                    await navigator.clipboard.writeText(hexColors);
+                    toast.success('All colors copied as HEX!');
+                  } catch (err) {
+                    toast.error('Failed to copy colors');
+                  }
+                }}
+                className="gap-2"
+              >
+                <Copy className="h-4 w-4" />
+                Copy All HEX Colors
+              </Button>
+            </div>
+          )}
         </div>
 
-        {/* Palette Metrics */}
-        {palette.length > 0 && <PaletteMetrics palette={palette} />}
+        {/* Advanced Features - Collapsible */}
+        {palette.length > 0 && (
+          <>
+            <CollapsibleSection
+              title="📊 Palette Metrics"
+              description="View accessibility, harmony, and uniqueness scores"
+              defaultOpen={false}
+              icon={null}
+            >
+              <PaletteMetrics palette={palette} />
+            </CollapsibleSection>
 
-        {/* Gradient Generator */}
-        {palette.length > 0 && <GradientGenerator palette={palette} />}
+            <CollapsibleSection
+              title="🎨 Gradient Generator"
+              description="Create beautiful gradients from your palette colors"
+              defaultOpen={false}
+              icon={null}
+            >
+              <GradientGenerator palette={palette} />
+            </CollapsibleSection>
 
-        {/* Color Wheel Visualization */}
-        {palette.length > 0 && <ColorWheel palette={palette} />}
+            <CollapsibleSection
+              title="🎯 Color Wheel"
+              description="Visualize your palette on the color wheel"
+              defaultOpen={false}
+              icon={null}
+            >
+              <ColorWheel palette={palette} />
+            </CollapsibleSection>
 
-        {/* UI Mockup Preview */}
-        {palette.length > 0 && <UIMockupPreview palette={palette} />}
+            <CollapsibleSection
+              title="📱 UI Preview"
+              description="See how your palette looks on real UI elements"
+              defaultOpen={false}
+              icon={null}
+            >
+              <UIMockupPreview palette={palette} />
+            </CollapsibleSection>
+          </>
+        )}
 
-        {/* Export Section */}
+        {/* Export Section - Simplified */}
         <Card>
           <CardHeader>
             <CardTitle>Export Palette</CardTitle>
@@ -536,17 +611,49 @@ function App() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {EXPORT_FORMATS.map(format => (
+            <div className="flex items-center gap-3 mb-4">
+              <label className="text-sm font-medium whitespace-nowrap">Format:</label>
+              <div className="flex gap-2 flex-wrap flex-1">
+                {/* Top 3 most common formats */}
                 <Button
-                  key={format.value}
-                  variant={exportFormat === format.value ? 'default' : 'outline'}
+                  variant={exportFormat === 'hex' ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setExportFormat(format.value)}
+                  onClick={() => setExportFormat('hex')}
                 >
-                  {format.label}
+                  HEX
                 </Button>
-              ))}
+                <Button
+                  variant={exportFormat === 'css' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setExportFormat('css')}
+                >
+                  CSS
+                </Button>
+                <Button
+                  variant={exportFormat === 'tailwind' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setExportFormat('tailwind')}
+                >
+                  Tailwind
+                </Button>
+
+                {/* More formats in Select dropdown */}
+                <Select
+                  value={exportFormat}
+                  onValueChange={(value) => setExportFormat(value as ExportFormat)}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="More formats..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPORT_FORMATS.filter(f => !['hex', 'css', 'tailwind'].includes(f.value)).map(format => (
+                      <SelectItem key={format.value} value={format.value}>
+                        {format.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex gap-3">
               <Button onClick={handleExport} className="gap-2">

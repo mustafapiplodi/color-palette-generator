@@ -122,26 +122,13 @@ export function EnhancedColorCard({
         </div>
 
         <CardContent className="p-4 space-y-3">
-          {/* Color Info */}
+          {/* Color Info - Always Visible */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <div className="text-xs text-muted-foreground uppercase tracking-wide">
                 {color.role}
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-xs" title={temperature}>
-                  {tempIcon}
-                </span>
-                <Badge variant="outline" className="text-xs">
-                  <Sun className="h-3 w-3 mr-1" />
-                  {brightness}%
-                </Badge>
-              </div>
             </div>
-
-            <p className="text-sm font-medium text-muted-foreground mb-1">
-              {colorName}
-            </p>
 
             <div className="flex items-center justify-between">
               <span className="font-mono font-semibold text-sm">{color.hex}</span>
@@ -160,30 +147,56 @@ export function EnhancedColorCard({
             </div>
           </div>
 
-          {/* Color Values */}
-          <div className="text-xs space-y-0.5 text-muted-foreground">
-            <div>RGB: {color.rgb.r}, {color.rgb.g}, {color.rgb.b}</div>
-            <div>HSL: {color.hsl.h}°, {color.hsl.s}%, {color.hsl.l}%</div>
-          </div>
-
-          {/* Contrast Info */}
-          {contrastCheck && (
-            <div className="text-xs border-t pt-2">
-              <div className="flex items-center gap-1 mb-1">
-                {contrastCheck.passAA ? (
-                  <Check className="h-3 w-3 text-green-500" />
-                ) : (
-                  <AlertCircle className="h-3 w-3 text-yellow-500" />
-                )}
-                <span>Contrast: {contrastCheck.ratio}:1</span>
+          {/* Expanded Details - Only when selected */}
+          {isSelected && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="space-y-3"
+            >
+              {/* Color Name and Temperature */}
+              <div className="border-t pt-3">
+                <p className="text-sm font-medium text-muted-foreground mb-2">
+                  {colorName}
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs flex items-center gap-1" title={temperature}>
+                    {tempIcon} {temperature}
+                  </span>
+                  <Badge variant="outline" className="text-xs">
+                    <Sun className="h-3 w-3 mr-1" />
+                    {brightness}%
+                  </Badge>
+                </div>
               </div>
-              <Badge
-                variant={contrastCheck.passAAA ? 'success' : contrastCheck.passAA ? 'warning' : 'destructive'}
-                className="text-xs"
-              >
-                {contrastCheck.passAAA ? 'AAA' : contrastCheck.passAA ? 'AA' : 'Fail'}
-              </Badge>
-            </div>
+
+              {/* Color Values */}
+              <div className="text-xs space-y-0.5 text-muted-foreground">
+                <div>RGB: {color.rgb.r}, {color.rgb.g}, {color.rgb.b}</div>
+                <div>HSL: {color.hsl.h}°, {color.hsl.s}%, {color.hsl.l}%</div>
+              </div>
+
+              {/* Contrast Info */}
+              {contrastCheck && (
+                <div className="text-xs border-t pt-2">
+                  <div className="flex items-center gap-1 mb-1">
+                    {contrastCheck.passAA ? (
+                      <Check className="h-3 w-3 text-green-500" />
+                    ) : (
+                      <AlertCircle className="h-3 w-3 text-yellow-500" />
+                    )}
+                    <span>Contrast: {contrastCheck.ratio}:1</span>
+                  </div>
+                  <Badge
+                    variant={contrastCheck.passAAA ? 'success' : contrastCheck.passAA ? 'warning' : 'destructive'}
+                    className="text-xs"
+                  >
+                    {contrastCheck.passAAA ? 'AAA' : contrastCheck.passAA ? 'AA' : 'Fail'}
+                  </Badge>
+                </div>
+              )}
+            </motion.div>
           )}
 
           {/* HSL Sliders */}
