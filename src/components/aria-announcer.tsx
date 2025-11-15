@@ -6,7 +6,7 @@ interface AriaAnnouncerProps {
 }
 
 export function AriaAnnouncer({ message, politeness = 'polite' }: AriaAnnouncerProps) {
-  const timeoutRef = useRef<number>();
+  const timeoutRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     // Clear any existing timeout
