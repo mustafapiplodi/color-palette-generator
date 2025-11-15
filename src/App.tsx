@@ -12,7 +12,6 @@ import { TemplatesDialog } from './components/templates-dialog';
 import { GradientGenerator } from './components/gradient-generator';
 import { ColorWheel } from './components/color-wheel';
 import { UIMockupPreview } from './components/ui-mockup-preview';
-import { CollapsibleSection } from './components/collapsible-section';
 import { HarmonySelector } from './components/harmony-selector';
 import { AriaAnnouncer } from './components/aria-announcer';
 import { MobileExportSheet } from './components/mobile-export-sheet';
@@ -70,14 +69,6 @@ import { usePaletteHistory } from './hooks/usePaletteHistory';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useOnboardingTour } from './hooks/useOnboardingTour';
-
-const HARMONY_TYPES: { value: HarmonyType; label: string; description: string }[] = [
-  { value: 'monochromatic', label: 'Monochromatic', description: 'Single hue variations' },
-  { value: 'analogous', label: 'Analogous', description: 'Adjacent colors (±30°)' },
-  { value: 'complementary', label: 'Complementary', description: 'Opposite (180°)' },
-  { value: 'triadic', label: 'Triadic', description: '120° spacing' },
-  { value: 'tetradic', label: 'Tetradic', description: 'Two pairs' },
-];
 
 const EXPORT_FORMATS: { value: ExportFormat; label: string }[] = [
   { value: 'hex', label: 'HEX' },

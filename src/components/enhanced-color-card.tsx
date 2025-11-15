@@ -8,7 +8,6 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import {
   Lock,
   Unlock,
-  Copy,
   Check,
   AlertCircle,
   Sun,
@@ -18,7 +17,7 @@ import {
 } from 'lucide-react';
 import type { PaletteColor } from '@/utils/colorTheory';
 import { getContrastRatio } from '@/utils/colorTheory';
-import { getColorName, getColorTemperature, getColorBrightness, getOptimalTextColor } from '@/utils/colorHelpers';
+import { getColorName, getColorTemperature, getColorBrightness } from '@/utils/colorHelpers';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -38,17 +37,14 @@ export function EnhancedColorCard({
   color,
   index,
   isSelected,
-  copiedIndex,
   onSelect,
   onToggleLock,
-  onCopy,
   onAdjust,
   contrastWith,
 }: EnhancedColorCardProps) {
   const colorName = getColorName(color.hex);
   const temperature = getColorTemperature(color.hex);
   const brightness = getColorBrightness(color.hex);
-  const textColor = getOptimalTextColor(color.hex);
   const [justCopied, setJustCopied] = useState(false);
   const [copiedFormat, setCopiedFormat] = useState<string>('');
 

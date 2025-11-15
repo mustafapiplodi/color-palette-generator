@@ -25,7 +25,7 @@ export function ImageUpload({ onColorsExtracted }: ImageUploadProps) {
         // Convert to hex and filter out very similar colors
         const hexColors = palette
           .map((rgb: number[]) => `#${rgb.map(c => c.toString(16).padStart(2, '0')).join('')}`)
-          .filter((color, index, arr) => {
+          .filter((_color, index) => {
             // Keep the first color always, and subsequent colors only if they're different enough
             if (index === 0) return true;
             // Check if this color is sufficiently different from previous colors

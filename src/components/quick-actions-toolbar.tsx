@@ -57,7 +57,6 @@ export function QuickActionsToolbar({
   onDesaturate,
   palette,
 }: QuickActionsToolbarProps) {
-  const hasLockedColors = palette.some(c => c.locked);
   const allLocked = palette.every(c => c.locked);
 
   return (
